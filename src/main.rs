@@ -1,4 +1,4 @@
-use notes::{App, Notebook};
+use notes::App;
 
 fn main() {
     App::new().run();

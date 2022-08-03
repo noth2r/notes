@@ -1,18 +1,18 @@
 mod note;
 mod questions;
-mod user_interface;
+mod ui;
 
 use colored::Colorize;
 use note::Notebook;
 use questions::{Questions, QuestionsLists};
-use std::collections::HashMap;
-use std::io;
+use std::{collections::HashMap, io};
 
-type F<'a> = for<'r> fn(&'r mut App<'a>);
+type FnFromApp<'a> = for<'r> fn(&'r mut App<'a>);
 
 pub struct App<'a> {
-    pub data: HashMap<String, Notebook<'a>>,
-    tasks: Vec<F<'a>>,
+    notebook: Option<Notebook>,
+    tasks: Vec<FnFromApp<'a>>,
+    path: String,
     die: bool,
 }
 
@@ -20,8 +20,9 @@ pub struct App<'a> {
 impl<'a> App<'a> {
     pub fn new() -> Self {
         App {
-            data: HashMap::new(),
+            notebook: None,
             tasks: Vec::new(),
+            path: String::new(),
             die: false,
         }
     }
@@ -59,13 +60,13 @@ impl<'a> App<'a> {
 impl<'a> App<'a> {
     fn user_choice<Closure>(&mut self, question_list: QuestionsLists, choise_fn: Closure)
     where
-        Closure: FnOnce(&Option<&Questions>) -> F<'a>,
+        Closure: FnOnce(&Option<&Questions>) -> FnFromApp<'a>,
     {
-        let list = question_list.as_str();
+        let list = question_list.as_list();
 
         print!("{}\n", list);
 
-        if let Ok(num) = user_interface::user_choice("Write a number") {
+        if let Ok(num) = ui::user_choice("Write a number") {
             let vec = question_list.as_vec();
             let choice = vec.get(num as usize);
             let ptr = choise_fn(&choice);
@@ -76,30 +77,37 @@ impl<'a> App<'a> {
         }
     }
 
-    fn fields(&mut self, map: &mut HashMap<&'a str, Option<String>>) -> Option<io::Error> {
-        let mut keys = map.keys().cloned().collect::<Vec<&str>>();
+    fn fields<'b>(
+        &self,
+        mut keys: Vec<&'b str>,
+        mut questions: Vec<&str>,
+    ) -> Result<HashMap<&'b str, String>, io::Error> {
+        let mut map: HashMap<&'b str, String> = HashMap::with_capacity(keys.len());
 
-        // While keys is not empty
-        while let Some(key) = keys.get(0) {
-            println!("{key}");
+        while let (Some(key), Some(question)) = (keys.get(0), questions.get(0)) {
+            println!("{question}");
 
-            match user_interface::input() {
-                Ok(input) => {
-                    map.insert(key, Some(input));
-                    keys.remove(0);
-                }
-                Err(error) => return Some(error),
-            }
+            // Get user input
+            let input = ui::input()?;
+
+            // Add value from input to field
+            map.insert(key, input);
+
+            // Remove unusable values
+            keys.remove(0);
+            questions.remove(0);
+
+            ui::clear_terminal();
         }
 
-        None
+        Ok(map)
     }
 }
 
 // Tabs
 impl<'a> App<'a> {
     fn home(&mut self) {
-        user_interface::clear_terminal();
+        ui::clear_terminal();
 
         let title = format!("{}", "-- Notes --\n").yellow();
         println!("{title}");
@@ -107,44 +115,90 @@ impl<'a> App<'a> {
         self.user_choice(QuestionsLists::Home, |&choice| match choice {
             Some(&Questions::AddNotebook) => App::create_notebook,
             Some(&Questions::RmNotebook) => App::rm_notebook,
+            Some(&Questions::UseNotebook) => App::use_notebook,
             Some(&Questions::Exit) => App::stop,
             _ => App::greeting,
         })
     }
 
+    fn rm_notebook(&mut self) {}
+
+    fn use_notebook(&mut self) {
+        if let Some(_) = &mut self.notebook {
+            self.tasks.push(App::notebook_menu);
+        } else {
+            self.tasks.push(App::home);
+        }
+    }
+
     fn create_notebook(&mut self) {
-        user_interface::clear_terminal();
+        ui::clear_terminal();
 
         let colored_str = format!("{}", "Notebook name:").yellow();
         println!("{}", colored_str);
 
-        match user_interface::input() {
+        match ui::input() {
             Ok(name) => {
-                let name = name.trim().to_string();
-                let notebook = Notebook::new(name);
-
-                self.data.insert(notebook.name.clone(), notebook);
+                self.notebook = Some(Notebook::new(name));
                 self.tasks.push(App::notebook_menu);
             }
             Err(error) => {
-                eprintln!("{}", format!("Unknown error: {}", error));
+                eprintln!("Unknown error: {}", error);
                 self.tasks.push(App::home);
             }
         }
     }
 
     fn notebook_menu(&mut self) {
-        user_interface::clear_terminal();
+        ui::clear_terminal();
+
         self.user_choice(QuestionsLists::NotebookMenu, |&choice| match choice {
+            Some(&Questions::ShowNotes) => App::show_notes,
             Some(&Questions::AddNote) => App::add_note,
             Some(&Questions::Back) => App::home,
             _ => App::notebook_menu,
         })
     }
 
-    fn add_note(&mut self) {
-        user_interface::clear_terminal();
+    fn show_notes(&mut self) {
+        ui::clear_terminal();
+
+        if let Some(notebook) = &mut self.notebook {
+            println!("{}", notebook.as_list());
+
+            match ui::input() {
+                Ok(_) => self.tasks.push(App::notebook_menu),
+                Err(error) => eprintln!("{error}"),
+            };
+        } else {
+            self.tasks.push(App::home);
+        }
     }
 
-    fn rm_notebook(&mut self) {}
+    fn add_note(&mut self) {
+        ui::clear_terminal();
+
+        let map_keys = vec!["name", "description"];
+        let map_questions = QuestionsLists::AddNote
+            .as_vec()
+            .iter()
+            .map(|q| q.as_str())
+            .collect::<Vec<&str>>();
+
+        // Add note or go home
+        if let Ok(mut map) = self.fields(map_keys, map_questions) {
+            let vec = map.drain().map(|(_k, v)| v).collect::<Vec<_>>();
+            let key = vec[0].to_owned();
+            let description = vec[1].to_owned();
+
+            if let Some(notebook) = &mut self.notebook {
+                notebook.add(key, description);
+            } else {
+                self.tasks.push(App::home);
+            }
+        }
+
+        // Go to notebook menu
+        self.tasks.push(App::notebook_menu);
+    }
 }

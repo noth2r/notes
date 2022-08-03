@@ -2,6 +2,7 @@
 pub enum QuestionsLists {
     Home,
     NotebookMenu,
+    AddNote,
 }
 
 impl QuestionsLists {
@@ -10,18 +11,21 @@ impl QuestionsLists {
             QuestionsLists::Home => vec![
                 Questions::AddNotebook,
                 Questions::RmNotebook,
+                Questions::UseNotebook,
                 Questions::Exit,
             ],
             QuestionsLists::NotebookMenu => vec![
+                Questions::ShowNotes,
                 Questions::AddNote,
                 Questions::RmNote,
                 Questions::UpdNote,
                 Questions::Back,
             ],
+            QuestionsLists::AddNote => vec![Questions::NoteName, Questions::NoteDescription],
         }
     }
 
-    pub fn as_str(&self) -> String {
+    pub fn as_list(&self) -> String {
         let mut string = String::new();
         let vec = self.as_vec();
 
@@ -35,12 +39,17 @@ impl QuestionsLists {
 
 #[derive(Debug)]
 pub enum Questions {
+    ShowNotes,
     AddNote,
     RmNote,
     UpdNote,
 
     AddNotebook,
     RmNotebook,
+    UseNotebook,
+
+    NoteName,
+    NoteDescription,
 
     Back,
     Exit,
@@ -49,12 +58,17 @@ pub enum Questions {
 impl Questions {
     pub fn as_str<'a>(&self) -> &'a str {
         match self {
+            Questions::ShowNotes => "See list of notes.",
             Questions::AddNote => "Do you want to create a note?",
             Questions::RmNote => "Do you want to remove a note?",
             Questions::UpdNote => "Do you want to update a note?",
 
             Questions::AddNotebook => "Do you want to create a notebook?",
             Questions::RmNotebook => "Do you want to remove a notebook?",
+            Questions::UseNotebook => "Use an existing notebook.",
+
+            Questions::NoteName => "Note name:",
+            Questions::NoteDescription => "Note description:",
 
             Questions::Back => "Back",
             Questions::Exit => "Exit",
