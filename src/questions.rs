@@ -18,7 +18,6 @@ impl QuestionsLists {
                 Questions::ShowNotes,
                 Questions::AddNote,
                 Questions::RmNote,
-                Questions::UpdNote,
                 Questions::Back,
             ],
             QuestionsLists::AddNote => vec![Questions::NoteName, Questions::NoteDescription],
@@ -42,7 +41,6 @@ pub enum Questions {
     ShowNotes,
     AddNote,
     RmNote,
-    UpdNote,
 
     AddNotebook,
     RmNotebook,
@@ -58,10 +56,9 @@ pub enum Questions {
 impl Questions {
     pub fn as_str<'a>(&self) -> &'a str {
         match self {
-            Questions::ShowNotes => "See list of notes.",
+            Questions::ShowNotes => "Show notebook.",
             Questions::AddNote => "Do you want to create a note?",
             Questions::RmNote => "Do you want to remove a note?",
-            Questions::UpdNote => "Do you want to update a note?",
 
             Questions::AddNotebook => "Do you want to create a notebook?",
             Questions::RmNotebook => "Do you want to remove a notebook?",

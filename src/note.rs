@@ -8,6 +8,14 @@ impl Note {
     pub fn new(name: String, description: String) -> Self {
         Self { name, description }
     }
+
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn get_description(&self) -> &String {
+        &self.description
+    }
 }
 
 #[derive(Debug)]
@@ -24,22 +32,13 @@ impl Notebook {
         }
     }
 
-    pub fn rename(&mut self, name: String) {
-        self.name = name;
-    }
-
     pub fn add(&mut self, name: String, description: String) {
         let note = Note::new(name, description);
         self.notes.push(note);
     }
 
-    pub fn rm(&mut self, name: String) {
-        self.notes.retain(|note| note.name.contains(&name) == false);
-    }
-
-    pub fn upd(&mut self, name: String, note: Note) {
-        self.rm(name);
-        self.add(note.name, note.description);
+    pub fn rm(&mut self, index: usize) {
+        self.notes.remove(index);
     }
 
     pub fn as_list(&self) -> String {
@@ -65,7 +64,7 @@ mod notebook {
         notebook.add(String::from("some name"), String::from("qwroqwrooqwro"));
         notebook.add(String::from("some"), String::from("qwroqwrooqwro"));
 
-        notebook.rm(String::from("some name"));
+        notebook.rm(0);
 
         assert_eq!(
             notebook.notes,
